@@ -15,7 +15,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="FTP.cpp">
+    <ClCompile Include="FTPClient.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

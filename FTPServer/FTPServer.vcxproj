@@ -21,8 +21,8 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{c4d8c9ba-82a4-4542-abb4-743c9b04c98a}</ProjectGuid>
-    <RootNamespace>FTP</RootNamespace>
+    <ProjectGuid>{25d306bb-fd60-4c30-8c24-058bb36e8eac}</ProjectGuid>
+    <RootNamespace>FTPServer</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -127,7 +127,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="FTP.cpp" />
+    <ClCompile Include="FTPServer.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
