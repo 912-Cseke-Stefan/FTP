@@ -129,11 +129,9 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="FTPServer.cpp" />
-    <ClCompile Include="Socket.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="FTPServer.h" />
-    <ClInclude Include="Socket.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
