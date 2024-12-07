@@ -1,6 +1,7 @@
 #pragma once
 
 #include <fstream>
+#include <queue>
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #pragma comment(lib, "Ws2_32.lib")
@@ -15,17 +16,22 @@ private:
     std::string port;
     ThreadPool thread_pool;
     std::vector<std::pair<std::string, std::string>> users_and_passwords;
+    std::string working_directory;
+    std::queue<int> available_ports;
+    std::mutex access_the_queue;
 
     void handle_user(const std::string& username) {}
     void handle_pass(const std::string& password) {}
     void handle_list() {}
     void handle_retr() {}
     void handle_stor() {}
-    void handle_pasv() {}
+    SOCKET start_listening_on_port(int data_port);
+    SOCKET accept_connection_on_socket(SOCKET socket);
     void get_command_from_client(SOCKET client_socket);
 
     std::string first_word_to_lower(const char* command);
     std::string get_argument(const char* command);
+    std::string clean_filename(const std::string& filename);
 
     bool is_username_a_user(std::string username);
     bool is_valid_password(std::string username, std::string password);

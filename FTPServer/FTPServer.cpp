@@ -6,7 +6,7 @@
 
 
 FTPServer::FTPServer(std::string port, std::string path_to_users) : 
-    control_socket(INVALID_SOCKET), port(port), thread_pool(10), users_and_passwords()
+    control_socket(INVALID_SOCKET), port(port), thread_pool(10), working_directory(WORKING_DIRECTORY)
 {
     WSADATA wsaData;
     struct addrinfo* result = NULL, hints;
@@ -201,18 +201,18 @@ void FTPServer::get_command_from_client(SOCKET client_socket)
                             send(client_socket, "530 Not logged in\r\n", 19, 0);  // Not logged in.
                         else
                         {
-                        std::string passwd = get_argument(command_builder);
-                        if (is_valid_password(current_user, passwd))
+                            std::string passwd = get_argument(command_builder);
+                            if (is_valid_password(current_user, passwd))
                             {
                                 directory_of_user = working_directory + current_user + '\\';  // no path traversal should be possible
                                 send(client_socket, "230 User logged in, proceed\r\n", 29, 0);  // User logged in, proceed.
                             }
-                        else
-                        {
-                            current_user = "";
+                            else
+                            {
+                                current_user = "";
                                 send(client_socket, "530 Not logged in\r\n", 19, 0);  // Not logged in.
+                            }
                         }
-                    }
                     }
                     else if (command == "quit")
                     {
@@ -226,15 +226,34 @@ void FTPServer::get_command_from_client(SOCKET client_socket)
                     }
                     else if (command == "retr")
                     {
-
+                        if (directory_of_user == "")
+                            send(client_socket, "530 Not logged in\r\n", 19, 0);  // Not logged in.
+                        else
+                        {
+                            std::string dirty_filename = get_argument(command_builder);
+                            std::string filename = clean_filename(dirty_filename);
+                        }
                     }
                     else if (command == "stor")
                     {
-
+                        if (directory_of_user == "")
+                            send(client_socket, "530 Not logged in\r\n", 19, 0);  // Not logged in.
+                        else
+                        {
+                            std::string dirty_filename = get_argument(command_builder);
+                            std::string filename = clean_filename(dirty_filename);
+                            
+                        }
                     }
                     else if (command == "list")
                     {
-
+                        if (directory_of_user == "")
+                            send(client_socket, "530 Not logged in\r\n", 19, 0);  // Not logged in.
+                        else
+                        {
+                            // we ignore the argument for now, as we won't have any folder hierarchy
+                            
+                        }
                     }
                     else if (command == "pasv")
                     {
@@ -319,6 +338,19 @@ std::string FTPServer::get_argument(const char* command)
     word[index2 - index] = '\0';
 
     return std::string(word);
+}
+
+std::string FTPServer::clean_filename(const std::string& filename)
+{
+    std::string result = filename;//"/sadf/asdf//asdf////dsf../../dsf/././/..../d"
+    size_t index_of_bad_characters;
+    while ((index_of_bad_characters = result.find("..")) != std::string::npos)
+        result.erase(index_of_bad_characters, 2);
+    while ((index_of_bad_characters = result.find("\\")) != std::string::npos)
+        result.erase(index_of_bad_characters, 1);
+    while ((index_of_bad_characters = result.find("/")) != std::string::npos)
+        result.erase(index_of_bad_characters, 1);
+    return result;
 }
 
 bool FTPServer::is_username_a_user(std::string username)
