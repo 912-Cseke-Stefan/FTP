@@ -6,7 +6,7 @@
 int main() {
     try {
         FTPServer server = FTPServer();
-        std::cout << "Listening on port 21...\n";
+        std::cout << "Listening on port " << DEFAULT_PORT << "...\n";
         server.start();
     }
     catch (const std::exception& e) {
