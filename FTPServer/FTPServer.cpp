@@ -1,4 +1,5 @@
 #define DEFAULT_PORT "21"
+#define _CRT_SECURE_NO_WARNINGS
 
 #include <iostream>
 #include <string>
@@ -71,6 +72,92 @@ void FTPServer::start()
         // Spawn thread or use async to handle client
         thread_pool.enqueue([clientSocket, this]() { get_command_from_client(clientSocket); });
     }
+}
+
+void FTPServer::get_command_from_client(SOCKET client_socket)
+{
+    int iResult;
+    char recvbuf[100];
+    int recvbuflen = 100;
+
+    char command_builder[105];
+    int current_index = 0;
+
+    do
+    {
+        iResult = recv(client_socket, recvbuf, recvbuflen, 0);
+        if (iResult > 0)
+        {
+            strncpy(command_builder + current_index, recvbuf, 100 - current_index);
+            command_builder[100] = '\0';
+            if (strlen(command_builder) >= 100)
+            {
+                send(client_socket, "500", 3, 0);  // Syntax error, command unrecognized. In this case, command line too long.
+            }
+            else
+                current_index += iResult;
+        }
+        else if (iResult == 0)
+        {
+            std::string command = first_word_to_lower(command_builder);
+            if (command == "user")
+            {
+
+            }
+            else if (command == "pass")
+            {
+
+            }
+            else if (command == "quit")
+            {
+
+            }
+            else if (command == "retr")
+            {
+
+            }
+            else if (command == "stor")
+            {
+
+            }
+            else if (command == "list")
+            {
+
+            }
+            else if (command == "pasv")
+            {
+
+            }
+            else
+            {
+                send(client_socket, "502", 3, 0);  // Command not implemented.
+            }
+        }
+        else 
+        {
+            std::string msg("recv failed with error: " + std::to_string(WSAGetLastError()) + "\n");
+            closesocket(client_socket);
+            WSACleanup();
+            throw std::exception(msg.c_str());
+        }
+    } while (iResult > 0);
+
+}
+
+std::string FTPServer::first_word_to_lower(const char* command)
+{
+    // assume command is null-terminated byte string
+    int index = 0;
+    while (command[index] != ' ' && index < strlen(command))
+        index++;
+
+    char word[105];
+    strncpy(word, command, index);
+    word[100] = '\0';
+    for (int i = 0; word[i] != 0; i++)
+        word[i] = std::tolower(word[i]);
+
+    return std::string(word);
 }
 
 
