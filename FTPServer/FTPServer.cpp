@@ -5,7 +5,8 @@
 #include "FTPServer.h"
 
 
-FTPServer::FTPServer(std::string port = DEFAULT_PORT) : control_socket(INVALID_SOCKET), port(port)
+FTPServer::FTPServer(std::string port = DEFAULT_PORT) : 
+    control_socket(INVALID_SOCKET), port(port), thread_pool(10)
 {
     WSADATA wsaData;
     struct addrinfo* result = NULL, hints;
@@ -58,8 +59,6 @@ FTPServer::FTPServer(std::string port = DEFAULT_PORT) : control_socket(INVALID_S
         WSACleanup();
         throw std::exception(msg.c_str());
     }
-
-
 }
 
 void FTPServer::start() 
@@ -70,6 +69,7 @@ void FTPServer::start()
             continue;
 
         // Spawn thread or use async to handle client
+        thread_pool.enqueue([clientSocket, this]() { get_command_from_client(clientSocket); });
     }
 }
 
@@ -77,6 +77,8 @@ void FTPServer::start()
 int main() {
     try {
         FTPServer server = FTPServer();
+        std::cout << "Listening on port 21...\n";
+        server.start();
     }
     catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
