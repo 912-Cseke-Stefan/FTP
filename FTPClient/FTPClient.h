@@ -25,9 +25,9 @@ public:
     FTPClient(const std::string& address, int port);
     ~FTPClient();
 
-	void user(const std::string& username);
-	void pass(const std::string& password);
-    void logout();
+	std::string user(const std::string& username);
+	std::string pass(const std::string& password);
+    std::string logout();
     void uploadFile(const std::string& localPath, const std::string& remotePath);
     void downloadFile(const std::string& remotePath, const std::string& localPath);
 	void listFiles();

@@ -93,21 +93,21 @@ FTPClient::~FTPClient() {
 }
 
 
-void FTPClient::user(const std::string& username) {
+std::string FTPClient::user(const std::string& username) {
     sendCommand("USER " + username);
-	std::cout << readResponse();
+	return readResponse();
 }
 
 
-void FTPClient::pass(const std::string& password) {
+std::string FTPClient::pass(const std::string& password) {
 	sendCommand("PASS " + password);
-	std::cout << readResponse();
+	return readResponse();
 }
 
 
-void FTPClient::logout() {
+std::string FTPClient::logout() {
     sendCommand("QUIT");
-    std::cout << readResponse();
+	return readResponse();
 }
 
 
