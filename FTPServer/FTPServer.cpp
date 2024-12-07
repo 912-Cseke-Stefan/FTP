@@ -268,7 +268,8 @@ void FTPServer::get_command_from_client(SOCKET client_socket)
                             access_the_queue.unlock();
                             // prepare to listen on the offered port
                             SOCKET listening_socket = start_listening_on_port(passive_port);
-                            send(client_socket, (std::string("227 ") + std::to_string(passive_port)).c_str(), 8, 0);  // Entering Passive Mode (h1,h2,h3,h4,p1,p2).
+                            send(client_socket, (std::string("227 Entering Passive Mode (127.0.0.1,") + std::to_string(passive_port) + std::string(")\r\n")).c_str(), 44, 0);  // Entering Passive Mode (h1,h2,h3,h4,p1,p2).
+                            // it is assummed that the client will try to connect immediately after getting the port
                             data_connection = accept_connection_on_socket(listening_socket);
                         }
                     }
