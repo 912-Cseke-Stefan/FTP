@@ -434,6 +434,13 @@ void FTPServer::get_command_from_client(SOCKET client_socket)
                         else
                             send(client_socket, "200 Everything is fine...\r\n", 27, 0);
                     }
+                    else if (command == "cwd")
+                    {
+                        if (directory_of_user == "")
+                            send(client_socket, "530 Not logged in\r\n", 19, 0);  // Not logged in.
+                        else
+                            send(client_socket, "250 Everything is fine...\r\n", 27, 0);
+                    }
                     else
                     {
                         send(client_socket, "502 Command not implemented\r\n", 29, 0);  // Command not implemented.
