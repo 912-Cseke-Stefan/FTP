@@ -162,6 +162,7 @@ void FTPServer::get_command_from_client(SOCKET client_socket)
     bool passive = false;
     int passive_port = -1;
     SOCKET data_connection = INVALID_SOCKET;
+    SOCKET listening_socket;
 
     int iResult;
     char recvbuf[101];
@@ -328,63 +329,67 @@ void FTPServer::get_command_from_client(SOCKET client_socket)
                             if (passive)
                             {
                                 if (data_connection != INVALID_SOCKET)
-                                {
                                     send(client_socket, "125 Data connection already open; transfer starting\r\n", 53, 0);
-
-                                    char buffer[1000];
-                                    char zero_buffer[1000] = {};
-                                    for (const auto& entry : std::filesystem::directory_iterator(directory_of_user))
-                                    {
-                                        strncpy(buffer, zero_buffer, 1000);
-                                        int length = 0;
-                                        
-                                        strncpy(buffer, "-rw-rw-rw- 1 ", 15);
-                                        length += 13;
-
-                                        strncpy(buffer + length, current_user.c_str(), current_user.size());
-                                        length += static_cast<int>(current_user.size());
-                                        buffer[length] = ' ';
-                                        length++;
-
-                                        strncpy(buffer + length, current_user.c_str(), current_user.size());
-                                        length += static_cast<int>(current_user.size());
-                                        buffer[length] = ' ';
-                                        length++;
-
-                                        strncpy(buffer + length, 
-                                                std::to_string(std::filesystem::file_size(entry.path())).c_str(), 
-                                                std::to_string(std::filesystem::file_size(entry.path())).size());
-                                        length += static_cast<int>(std::to_string(std::filesystem::file_size(entry.path())).size());
-                                        buffer[length] = ' ';
-                                        length++;
-
-                                        strncpy(buffer + length,
-                                            std::format("{}", std::filesystem::last_write_time(entry.path())).c_str(),
-                                            std::format("{}", std::filesystem::last_write_time(entry.path())).size());
-                                        length += static_cast<int>(std::format("{}", std::filesystem::last_write_time(entry.path())).size());
-                                        buffer[length] = ' ';
-                                        length++;
-
-                                        strncpy(buffer + length, 
-                                                entry.path().string().substr(directory_of_user.size()).c_str(), 
-                                                997 - length);
-                                        buffer[strlen(buffer)] = 13;
-                                        buffer[strlen(buffer)] = 10;
-
-                                        send(data_connection, buffer, static_cast<int>(strlen(buffer)), 0);
-                                    }
-
-                                    send(client_socket, "226 Transfer OK\r\n", 17, 0);
-
-                                    // deallocate resources for this data socket
-                                    closesocket(data_connection);
-                                    passive = false;
-                                    data_connection = INVALID_SOCKET;
-                                    access_the_queue.lock();
-                                    available_ports.push(passive_port);
-                                    access_the_queue.unlock();
-                                    passive_port = -1;
+                                else
+                                {
+                                    data_connection = accept_connection_on_socket(listening_socket);
+                                    send(client_socket, "150 Connection accepted\r\n", 25, 0);
                                 }
+
+                                char buffer[1000];
+                                char zero_buffer[1000] = {};
+                                for (const auto& entry : std::filesystem::directory_iterator(directory_of_user))
+                                {
+                                    strncpy(buffer, zero_buffer, 1000);
+                                    int length = 0;
+                                        
+                                    strncpy(buffer, "-rw-rw-rw- 1 ", 15);
+                                    length += 13;
+
+                                    strncpy(buffer + length, current_user.c_str(), current_user.size());
+                                    length += static_cast<int>(current_user.size());
+                                    buffer[length] = ' ';
+                                    length++;
+
+                                    strncpy(buffer + length, current_user.c_str(), current_user.size());
+                                    length += static_cast<int>(current_user.size());
+                                    buffer[length] = ' ';
+                                    length++;
+
+                                    strncpy(buffer + length, 
+                                            std::to_string(std::filesystem::file_size(entry.path())).c_str(), 
+                                            std::to_string(std::filesystem::file_size(entry.path())).size());
+                                    length += static_cast<int>(std::to_string(std::filesystem::file_size(entry.path())).size());
+                                    buffer[length] = ' ';
+                                    length++;
+
+                                    std::string last_write_date = std::format("{}", std::filesystem::last_write_time(entry.path())).substr(0, 10);
+                                    strncpy(buffer + length,
+                                            last_write_date.c_str(),
+                                            last_write_date.size());
+                                    length += static_cast<int>(last_write_date.size());
+                                    buffer[length] = ' ';
+                                    length++;
+
+                                    strncpy(buffer + length, 
+                                            entry.path().string().substr(directory_of_user.size()).c_str(), 
+                                            997 - length);
+                                    buffer[strlen(buffer)] = 13;
+                                    buffer[strlen(buffer)] = 10;
+
+                                    send(data_connection, buffer, static_cast<int>(strlen(buffer)), 0);
+                                }
+
+                                send(client_socket, "226 Transfer OK\r\n", 17, 0);
+
+                                // deallocate resources for this data socket
+                                closesocket(data_connection);
+                                passive = false;
+                                data_connection = INVALID_SOCKET;
+                                access_the_queue.lock();
+                                available_ports.push(passive_port);
+                                access_the_queue.unlock();
+                                passive_port = -1;
                             }
                             else
                                 ;// should have received port from client
@@ -402,20 +407,34 @@ void FTPServer::get_command_from_client(SOCKET client_socket)
                             available_ports.pop();
                             access_the_queue.unlock();
                             // prepare to listen on the offered port
-                            SOCKET listening_socket = start_listening_on_port(passive_port);
+                            listening_socket = start_listening_on_port(passive_port);
                             
-                            send(client_socket, (std::string("227 Entering Passive Mode (127,0,0,1,") + std::to_string(passive_port/256) + std::string(",") + std::to_string(passive_port%256) + std::string(")\r\n")).c_str(), 44, 0);  // Entering Passive Mode (h1,h2,h3,h4,p1,p2).
+                            send(client_socket, (std::string("227 Entering Passive Mode (127,0,0,1,") + std::to_string(passive_port/256) + std::string(",") + std::to_string(passive_port%256) + std::string(")\r\n")).c_str(), 46, 0);  // Entering Passive Mode (h1,h2,h3,h4,p1,p2).
                             
                             std::stringstream ss;
                             ss << "PORT " << (char)127 << ',' << (char)0 << ',' << (char)0 << ',' << (char)1 << ',' << (char)(passive_port/256) << ',' << (char)(passive_port%256) << "\r\n";
-                            send(client_socket, ss.str().c_str(), 18, 0);
+                            //send(client_socket, ss.str().c_str(), 18, 0);
                             
-                            char client_response[11];
-                            int response_length = recv(client_socket, client_response, 10, 0);
-                            client_response[response_length] = 0;
-                            if (std::string(client_response).find("200") == 0)
-                                data_connection = accept_connection_on_socket(listening_socket);
+                            //char client_response[11];
+                            //int response_length = recv(client_socket, client_response, 10, 0);
+                            //client_response[response_length] = 0;
+                            //if (std::string(client_response).find("200") == 0)
+                            //    data_connection = accept_connection_on_socket(listening_socket);
                         }
+                    }
+                    else if (command == "pwd")
+                    {
+                        if (directory_of_user == "")
+                            send(client_socket, "530 Not logged in\r\n", 19, 0);  // Not logged in.
+                        else
+                            send(client_socket, "257 \"/\" is current directory\r\n", 30, 0);
+                    }
+                    else if (command == "type")
+                    {
+                        if (directory_of_user == "")
+                            send(client_socket, "530 Not logged in\r\n", 19, 0);  // Not logged in.
+                        else
+                            send(client_socket, "200 Everything is fine...\r\n", 27, 0);
                     }
                     else
                     {
