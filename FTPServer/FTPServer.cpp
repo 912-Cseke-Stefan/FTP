@@ -325,7 +325,69 @@ void FTPServer::get_command_from_client(SOCKET client_socket)
                         else
                         {
                             // we ignore the argument for now, as we won't have any folder hierarchy
+                            if (passive)
+                            {
+                                if (data_connection != INVALID_SOCKET)
+                                {
+                                    send(client_socket, "125 Data connection already open; transfer starting\r\n", 53, 0);
+
+                                    char buffer[1000];
+                                    char zero_buffer[1000] = {};
+                                    for (const auto& entry : std::filesystem::directory_iterator(directory_of_user))
+                                    {
+                                        strncpy(buffer, zero_buffer, 1000);
+                                        int length = 0;
+                                        
+                                        strncpy(buffer, "-rw-rw-rw- 1 ", 15);
+                                        length += 13;
+
+                                        strncpy(buffer + length, current_user.c_str(), current_user.size());
+                                        length += static_cast<int>(current_user.size());
+                                        buffer[length] = ' ';
+                                        length++;
+
+                                        strncpy(buffer + length, current_user.c_str(), current_user.size());
+                                        length += static_cast<int>(current_user.size());
+                                        buffer[length] = ' ';
+                                        length++;
                             
+                                        strncpy(buffer + length, 
+                                                std::to_string(std::filesystem::file_size(entry.path())).c_str(), 
+                                                std::to_string(std::filesystem::file_size(entry.path())).size());
+                                        length += static_cast<int>(std::to_string(std::filesystem::file_size(entry.path())).size());
+                                        buffer[length] = ' ';
+                                        length++;
+
+                                        strncpy(buffer + length,
+                                            std::format("{}", std::filesystem::last_write_time(entry.path())).c_str(),
+                                            std::format("{}", std::filesystem::last_write_time(entry.path())).size());
+                                        length += static_cast<int>(std::format("{}", std::filesystem::last_write_time(entry.path())).size());
+                                        buffer[length] = ' ';
+                                        length++;
+
+                                        strncpy(buffer + length, 
+                                                entry.path().string().substr(directory_of_user.size()).c_str(), 
+                                                997);
+                                        buffer[strlen(buffer)] = 13;
+                                        buffer[strlen(buffer)] = 10;
+
+                                        send(data_connection, buffer, static_cast<int>(strlen(buffer)), 0);
+                                    }
+
+                                    send(client_socket, "226 Transfer OK\r\n", 17, 0);
+
+                                    // deallocate resources for this data socket
+                                    closesocket(data_connection);
+                                    passive = false;
+                                    data_connection = INVALID_SOCKET;
+                                    access_the_queue.lock();
+                                    available_ports.push(passive_port);
+                                    access_the_queue.unlock();
+                                    passive_port = -1;
+                        }
+                    }
+                            else
+                                ;// should have received port from client
                         }
                     }
                     else if (command == "pasv")
