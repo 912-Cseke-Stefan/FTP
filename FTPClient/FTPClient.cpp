@@ -40,19 +40,44 @@ void FTPClient::sendCommand(const std::string& cmd)  const{
 
 
 std::string FTPClient::readResponse() const {
+    std::string response;
     char buffer[BUFFER_SIZE];
-    int bytesReceived = recv(controlSocket, buffer, BUFFER_SIZE - 1, 0);
-    if (bytesReceived == SOCKET_ERROR) {
-        throw std::runtime_error("Failed to read response: " + std::to_string(WSAGetLastError()));
+
+    timeval timeout{};
+    timeout.tv_sec = 1;
+    timeout.tv_usec = 0;
+    if (setsockopt(controlSocket, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout)) == SOCKET_ERROR) {
+        throw std::runtime_error("Failed to set socket timeout: " + std::to_string(WSAGetLastError()));
     }
-    buffer[bytesReceived] = '\0';
-    return std::string(buffer);
+
+    while (true) {
+        int bytesReceived = recv(controlSocket, buffer, BUFFER_SIZE - 1, 0);
+        if (bytesReceived == SOCKET_ERROR) {
+            int errorCode = WSAGetLastError();
+            if (errorCode == WSAETIMEDOUT) {
+                break;
+            }
+            else {
+                throw std::runtime_error("Failed to read response: " + std::to_string(errorCode));
+            }
+        }
+
+        if (bytesReceived == 0) {
+            break;
+        }
+
+        buffer[bytesReceived] = '\0';
+        response += buffer;
+    }
+
+    return response;
 }
 
 
 SOCKET FTPClient::enterPassiveMode() {
     sendCommand("PASV");
     std::string response = readResponse();
+    std::cout << response;
     if (response.substr(0, 3) != "227") {
         throw std::runtime_error("Failed to enter passive mode: " + response);
     }

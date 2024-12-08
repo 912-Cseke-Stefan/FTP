@@ -128,11 +128,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="ClientUI.cpp" />
     <ClCompile Include="FTPClient.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Utils.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ClientUI.h" />
     <ClInclude Include="FTPClient.h" />
     <ClInclude Include="Utils.h" />
   </ItemGroup>
