@@ -422,7 +422,14 @@ void FTPServer::get_command_from_client(SOCKET client_socket)
                             // prepare to listen on the offered port
                             listening_socket = start_listening_on_port(passive_port);
                             
-                            send(client_socket, (std::string("227 Entering Passive Mode (127,0,0,1,") + std::to_string(passive_port/256) + std::string(",") + std::to_string(passive_port%256) + std::string(")\r\n")).c_str(), 46, 0);  // Entering Passive Mode (h1,h2,h3,h4,p1,p2).
+                            send(client_socket, 
+                                 (std::string("227 Entering Passive Mode (127,0,0,1,") + 
+                                    std::to_string(passive_port/256) + std::string(",") + 
+                                    std::to_string(passive_port%256) + std::string(")\r\n")).c_str(), 
+                                 41 + 
+                                    static_cast<int>(std::to_string(passive_port/256).size()) + 
+                                    static_cast<int>(std::to_string(passive_port%256).size()),
+                                 0);  // Entering Passive Mode (h1,h2,h3,h4,p1,p2).
                         }
                     }
                     else if (command == "pwd")
