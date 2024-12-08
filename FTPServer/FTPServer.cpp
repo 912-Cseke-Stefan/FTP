@@ -2,6 +2,8 @@
 #define _CRT_SECURE_NO_WARNINGS
 
 #include <string>
+#include <filesystem>
+#include <sstream>
 #include "FTPServer.h"
 
 
@@ -232,6 +234,40 @@ void FTPServer::get_command_from_client(SOCKET client_socket)
                         {
                             std::string dirty_filename = get_argument(command_builder);
                             std::string filename = clean_filename(dirty_filename);
+                            std::string path_to_file = directory_of_user + filename;
+
+                            std::ifstream file_reader(path_to_file, std::ifstream::binary);
+                            if (!file_reader.is_open())
+                                send(client_socket, "550 File not found\r\n", 20, 0);
+                            else
+                            {
+                                if (passive)
+                                {
+                                    if (data_connection != INVALID_SOCKET)
+                                    {
+                                        send(client_socket, "125 Data connection already open; transfer starting\r\n", 53, 0);
+
+                                        char buffer[1000];
+                                        while (file_reader.read(buffer, 1000) || file_reader.gcount() > 0) 
+                                            send(data_connection, buffer, static_cast<int>(file_reader.gcount()), 0);
+
+                                        send(client_socket, "226 Transfer OK\r\n", 17, 0);
+
+                                        // deallocate resources for this data socket
+                                        closesocket(data_connection);
+                                        passive = false;
+                                        data_connection = INVALID_SOCKET;
+                                        access_the_queue.lock();
+                                        available_ports.push(passive_port);
+                                        access_the_queue.unlock();
+                                        passive_port = -1;
+                                    }
+                                }
+                                else
+                                    ;// should have received port from client
+
+                                file_reader.close();
+                            }
                         }
                     }
                     else if (command == "stor")
@@ -242,7 +278,44 @@ void FTPServer::get_command_from_client(SOCKET client_socket)
                         {
                             std::string dirty_filename = get_argument(command_builder);
                             std::string filename = clean_filename(dirty_filename);
-                            
+                            std::string path_to_file = directory_of_user + filename;
+
+                            std::ofstream file_writer(path_to_file, std::ofstream::binary);
+                            if (!file_writer.is_open())
+                                send(client_socket, "550 File was not created\r\n", 26, 0);
+                            else
+                            {
+                                if (passive)
+                                {
+                                    if (data_connection != INVALID_SOCKET)
+                                    {
+                                        send(client_socket, "125 Data connection already open; transfer starting\r\n", 53, 0);
+
+                                        char buffer[1000];
+                                        int bytes_read;
+                                        while ((bytes_read = recv(data_connection, buffer, 1000, 0)) > 0)
+                                            file_writer.write(buffer, bytes_read);
+
+                                        send(client_socket, "226 Transfer OK\r\n", 17, 0);
+
+                                        // deallocate resources for this data socket
+                                        if (data_connection != INVALID_SOCKET)  // client should have already closed the connection, but anyway
+                                        {
+                                            closesocket(data_connection);
+                                            data_connection = INVALID_SOCKET;
+                                        }
+                                        passive = false;
+                                        access_the_queue.lock();
+                                        available_ports.push(passive_port);
+                                        access_the_queue.unlock();
+                                        passive_port = -1;
+                                    }
+                                }
+                                else
+                                    ;// should have received port from client
+
+                                file_writer.close();
+                            }
                         }
                     }
                     else if (command == "list")
@@ -252,7 +325,69 @@ void FTPServer::get_command_from_client(SOCKET client_socket)
                         else
                         {
                             // we ignore the argument for now, as we won't have any folder hierarchy
-                            
+                            if (passive)
+                            {
+                                if (data_connection != INVALID_SOCKET)
+                                {
+                                    send(client_socket, "125 Data connection already open; transfer starting\r\n", 53, 0);
+
+                                    char buffer[1000];
+                                    char zero_buffer[1000] = {};
+                                    for (const auto& entry : std::filesystem::directory_iterator(directory_of_user))
+                                    {
+                                        strncpy(buffer, zero_buffer, 1000);
+                                        int length = 0;
+                                        
+                                        strncpy(buffer, "-rw-rw-rw- 1 ", 15);
+                                        length += 13;
+
+                                        strncpy(buffer + length, current_user.c_str(), current_user.size());
+                                        length += static_cast<int>(current_user.size());
+                                        buffer[length] = ' ';
+                                        length++;
+
+                                        strncpy(buffer + length, current_user.c_str(), current_user.size());
+                                        length += static_cast<int>(current_user.size());
+                                        buffer[length] = ' ';
+                                        length++;
+
+                                        strncpy(buffer + length, 
+                                                std::to_string(std::filesystem::file_size(entry.path())).c_str(), 
+                                                std::to_string(std::filesystem::file_size(entry.path())).size());
+                                        length += static_cast<int>(std::to_string(std::filesystem::file_size(entry.path())).size());
+                                        buffer[length] = ' ';
+                                        length++;
+
+                                        strncpy(buffer + length,
+                                            std::format("{}", std::filesystem::last_write_time(entry.path())).c_str(),
+                                            std::format("{}", std::filesystem::last_write_time(entry.path())).size());
+                                        length += static_cast<int>(std::format("{}", std::filesystem::last_write_time(entry.path())).size());
+                                        buffer[length] = ' ';
+                                        length++;
+
+                                        strncpy(buffer + length, 
+                                                entry.path().string().substr(directory_of_user.size()).c_str(), 
+                                                997 - length);
+                                        buffer[strlen(buffer)] = 13;
+                                        buffer[strlen(buffer)] = 10;
+
+                                        send(data_connection, buffer, static_cast<int>(strlen(buffer)), 0);
+                                    }
+
+                                    send(client_socket, "226 Transfer OK\r\n", 17, 0);
+
+                                    // deallocate resources for this data socket
+                                    closesocket(data_connection);
+                                    passive = false;
+                                    data_connection = INVALID_SOCKET;
+                                    access_the_queue.lock();
+                                    available_ports.push(passive_port);
+                                    access_the_queue.unlock();
+                                    passive_port = -1;
+                                }
+                            }
+                            else
+                                ;// should have received port from client
                         }
                     }
                     else if (command == "pasv")
@@ -268,8 +403,18 @@ void FTPServer::get_command_from_client(SOCKET client_socket)
                             access_the_queue.unlock();
                             // prepare to listen on the offered port
                             SOCKET listening_socket = start_listening_on_port(passive_port);
-                            send(client_socket, (std::string("227 ") + std::to_string(passive_port)).c_str(), 8, 0);  // Entering Passive Mode (h1,h2,h3,h4,p1,p2).
-                            data_connection = accept_connection_on_socket(listening_socket);
+                            
+                            send(client_socket, (std::string("227 Entering Passive Mode (127,0,0,1,") + std::to_string(passive_port/256) + std::string(",") + std::to_string(passive_port%256) + std::string(")\r\n")).c_str(), 44, 0);  // Entering Passive Mode (h1,h2,h3,h4,p1,p2).
+                            
+                            std::stringstream ss;
+                            ss << "PORT " << (char)127 << ',' << (char)0 << ',' << (char)0 << ',' << (char)1 << ',' << (char)(passive_port/256) << ',' << (char)(passive_port%256) << "\r\n";
+                            send(client_socket, ss.str().c_str(), 18, 0);
+                            
+                            char client_response[11];
+                            int response_length = recv(client_socket, client_response, 10, 0);
+                            client_response[response_length] = 0;
+                            if (std::string(client_response).find("200") == 0)
+                                data_connection = accept_connection_on_socket(listening_socket);
                         }
                     }
                     else
@@ -307,7 +452,7 @@ std::string FTPServer::first_word_to_lower(const char* command)
 {
     // assume command is null-terminated byte string
     int index = 0;
-    while (command[index] != ' ' && index < strlen(command))
+    while (command[index] != ' ' && command[index] != '\r' && index < strlen(command))
         index++;
 
     char word[105];
