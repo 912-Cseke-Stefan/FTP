@@ -381,7 +381,7 @@ std::string FTPServer::first_word_to_lower(const char* command)
 {
     // assume command is null-terminated byte string
     int index = 0;
-    while (command[index] != ' ' && index < strlen(command))
+    while (command[index] != ' ' && command[index] != '\r' && index < strlen(command))
         index++;
 
     char word[105];
