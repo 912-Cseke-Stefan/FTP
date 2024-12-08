@@ -3,6 +3,7 @@
 
 #include <string>
 #include <filesystem>
+#include <chrono>
 #include <sstream>
 #include "FTPServer.h"
 
@@ -356,20 +357,23 @@ void FTPServer::get_command_from_client(SOCKET client_socket)
                                     buffer[length] = ' ';
                                     length++;
 
-                                    strncpy(buffer + length, 
-                                            std::to_string(std::filesystem::file_size(entry.path())).c_str(), 
-                                            std::to_string(std::filesystem::file_size(entry.path())).size());
-                                    length += static_cast<int>(std::to_string(std::filesystem::file_size(entry.path())).size());
+                                    std::string size_of_file = std::to_string(std::filesystem::file_size(entry.path()));
+                                    std::string padding_of_spaces = std::string(13 - size_of_file.size(), ' ');
+                                    std::string size_string = padding_of_spaces + size_of_file;
+                                    strncpy(buffer + length,
+                                            size_string.c_str(),
+                                            size_string.size());
+                                    length += static_cast<int>(size_string.size());
                                     buffer[length] = ' ';
                                     length++;
 
-                                    std::string last_write_date = std::format("{}", std::filesystem::last_write_time(entry.path())).substr(0, 10);
+                                    char formatted_date[30];
+                                    get_formatted_date_and_time_from_file_time_in_buffer_of_30_bytes(
+                                        std::filesystem::last_write_time(entry.path()), formatted_date);
                                     strncpy(buffer + length,
-                                            last_write_date.c_str(),
-                                            last_write_date.size());
-                                    length += static_cast<int>(last_write_date.size());
-                                    buffer[length] = ' ';
-                                    length++;
+                                            formatted_date,
+                                            13);
+                                    length += 13;
 
                                     strncpy(buffer + length, 
                                             entry.path().string().substr(directory_of_user.size()).c_str(), 
@@ -410,16 +414,6 @@ void FTPServer::get_command_from_client(SOCKET client_socket)
                             listening_socket = start_listening_on_port(passive_port);
                             
                             send(client_socket, (std::string("227 Entering Passive Mode (127,0,0,1,") + std::to_string(passive_port/256) + std::string(",") + std::to_string(passive_port%256) + std::string(")\r\n")).c_str(), 46, 0);  // Entering Passive Mode (h1,h2,h3,h4,p1,p2).
-                            
-                            std::stringstream ss;
-                            ss << "PORT " << (char)127 << ',' << (char)0 << ',' << (char)0 << ',' << (char)1 << ',' << (char)(passive_port/256) << ',' << (char)(passive_port%256) << "\r\n";
-                            //send(client_socket, ss.str().c_str(), 18, 0);
-                            
-                            //char client_response[11];
-                            //int response_length = recv(client_socket, client_response, 10, 0);
-                            //client_response[response_length] = 0;
-                            //if (std::string(client_response).find("200") == 0)
-                            //    data_connection = accept_connection_on_socket(listening_socket);
                         }
                     }
                     else if (command == "pwd")
@@ -465,6 +459,30 @@ void FTPServer::get_command_from_client(SOCKET client_socket)
         available_ports.push(passive_port);
         access_the_queue.unlock();
     }
+}
+
+void FTPServer::get_formatted_date_and_time_from_file_time_in_buffer_of_30_bytes(
+    std::filesystem::file_time_type last_write, char* formatted_time)
+{
+    std::filesystem::file_time_type myfmtime = last_write;
+
+    // file_clock::file_time_type -> utc_clock::time_point
+    // -> system_clock::time_point -> time_t
+
+    std::chrono::time_point<std::chrono::system_clock> ftsys;
+
+#ifdef  __GNUC__
+    ftsys = chrono::file_clock::to_sys(myfmtime);
+#else
+    // MSVC, CLANG
+    ftsys = std::chrono::utc_clock::to_sys(std::chrono::file_clock::to_utc(myfmtime));
+#endif
+
+    time_t ftt = std::chrono::system_clock::to_time_t(ftsys);
+
+    struct tm ftm; ftm = { 0 };
+    localtime_s(&ftm, &ftt);
+    strftime(formatted_time, 30, "%b %d %H:%M ", &ftm);
 }
 
 std::string FTPServer::first_word_to_lower(const char* command)

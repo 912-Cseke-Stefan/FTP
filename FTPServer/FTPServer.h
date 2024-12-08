@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <queue>
+#include <filesystem>
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #pragma comment(lib, "Ws2_32.lib")
@@ -28,6 +29,7 @@ private:
     SOCKET start_listening_on_port(int data_port);
     SOCKET accept_connection_on_socket(SOCKET socket);
     void get_command_from_client(SOCKET client_socket);
+    void get_formatted_date_and_time_from_file_time_in_buffer_of_30_bytes(std::filesystem::file_time_type last_write, char* formatted_time);
 
     std::string first_word_to_lower(const char* command);
     std::string get_argument(const char* command);
