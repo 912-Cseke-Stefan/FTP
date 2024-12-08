@@ -246,24 +246,26 @@ void FTPServer::get_command_from_client(SOCKET client_socket)
                                 if (passive)
                                 {
                                     if (data_connection != INVALID_SOCKET)
-                                    {
                                         send(client_socket, "125 Data connection already open; transfer starting\r\n", 53, 0);
-
-                                        char buffer[1000];
-                                        while (file_reader.read(buffer, 1000) || file_reader.gcount() > 0) 
-                                            send(data_connection, buffer, static_cast<int>(file_reader.gcount()), 0);
-
-                                        send(client_socket, "226 Transfer OK\r\n", 17, 0);
-
-                                        // deallocate resources for this data socket
-                                        closesocket(data_connection);
-                                        passive = false;
-                                        data_connection = INVALID_SOCKET;
-                                        access_the_queue.lock();
-                                        available_ports.push(passive_port);
-                                        access_the_queue.unlock();
-                                        passive_port = -1;
+                                    else
+                                    {
+                                        data_connection = accept_connection_on_socket(listening_socket);
+                                        send(client_socket, "150 Connection accepted\r\n", 25, 0);
                                     }
+                                    char buffer[1000];
+                                    while (file_reader.read(buffer, 1000) || file_reader.gcount() > 0) 
+                                        send(data_connection, buffer, static_cast<int>(file_reader.gcount()), 0);
+
+                                    send(client_socket, "226 Transfer OK\r\n", 17, 0);
+
+                                    // deallocate resources for this data socket
+                                    closesocket(data_connection);
+                                    passive = false;
+                                    data_connection = INVALID_SOCKET;
+                                    access_the_queue.lock();
+                                    available_ports.push(passive_port);
+                                    access_the_queue.unlock();
+                                    passive_port = -1;
                                 }
                                 else
                                     ;// should have received port from client
@@ -290,28 +292,30 @@ void FTPServer::get_command_from_client(SOCKET client_socket)
                                 if (passive)
                                 {
                                     if (data_connection != INVALID_SOCKET)
-                                    {
                                         send(client_socket, "125 Data connection already open; transfer starting\r\n", 53, 0);
-
-                                        char buffer[1000];
-                                        int bytes_read;
-                                        while ((bytes_read = recv(data_connection, buffer, 1000, 0)) > 0)
-                                            file_writer.write(buffer, bytes_read);
-
-                                        send(client_socket, "226 Transfer OK\r\n", 17, 0);
-
-                                        // deallocate resources for this data socket
-                                        if (data_connection != INVALID_SOCKET)  // client should have already closed the connection, but anyway
-                                        {
-                                            closesocket(data_connection);
-                                            data_connection = INVALID_SOCKET;
-                                        }
-                                        passive = false;
-                                        access_the_queue.lock();
-                                        available_ports.push(passive_port);
-                                        access_the_queue.unlock();
-                                        passive_port = -1;
+                                    else
+                                    {
+                                        data_connection = accept_connection_on_socket(listening_socket);
+                                        send(client_socket, "150 Connection accepted\r\n", 25, 0);
                                     }
+                                    char buffer[1000];
+                                    int bytes_read;
+                                    while ((bytes_read = recv(data_connection, buffer, 1000, 0)) > 0)
+                                        file_writer.write(buffer, bytes_read);
+
+                                    send(client_socket, "226 Transfer OK\r\n", 17, 0);
+
+                                    // deallocate resources for this data socket
+                                    if (data_connection != INVALID_SOCKET)  // client should have already closed the connection, but anyway
+                                    {
+                                        closesocket(data_connection);
+                                        data_connection = INVALID_SOCKET;
+                                    }
+                                    passive = false;
+                                    access_the_queue.lock();
+                                    available_ports.push(passive_port);
+                                    access_the_queue.unlock();
+                                    passive_port = -1;
                                 }
                                 else
                                     ;// should have received port from client
