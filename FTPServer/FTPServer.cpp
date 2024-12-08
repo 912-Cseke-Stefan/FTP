@@ -2,6 +2,8 @@
 #define _CRT_SECURE_NO_WARNINGS
 
 #include <string>
+#include <filesystem>
+#include <sstream>
 #include "FTPServer.h"
 
 
@@ -232,6 +234,40 @@ void FTPServer::get_command_from_client(SOCKET client_socket)
                         {
                             std::string dirty_filename = get_argument(command_builder);
                             std::string filename = clean_filename(dirty_filename);
+                            std::string path_to_file = directory_of_user + filename;
+
+                            std::ifstream file_reader(path_to_file, std::ifstream::binary);
+                            if (!file_reader.is_open())
+                                send(client_socket, "550 File not found\r\n", 20, 0);
+                            else
+                            {
+                                if (passive)
+                                {
+                                    if (data_connection != INVALID_SOCKET)
+                                    {
+                                        send(client_socket, "125 Data connection already open; transfer starting\r\n", 53, 0);
+
+                                        char buffer[1000];
+                                        while (file_reader.read(buffer, 1000) || file_reader.gcount() > 0) 
+                                            send(data_connection, buffer, static_cast<int>(file_reader.gcount()), 0);
+
+                                        send(client_socket, "226 Transfer OK\r\n", 17, 0);
+
+                                        // deallocate resources for this data socket
+                                        closesocket(data_connection);
+                                        passive = false;
+                                        data_connection = INVALID_SOCKET;
+                                        access_the_queue.lock();
+                                        available_ports.push(passive_port);
+                                        access_the_queue.unlock();
+                                        passive_port = -1;
+                        }
+                    }
+                                else
+                                    ;// should have received port from client
+
+                                file_reader.close();
+                            }
                         }
                     }
                     else if (command == "stor")
@@ -242,7 +278,44 @@ void FTPServer::get_command_from_client(SOCKET client_socket)
                         {
                             std::string dirty_filename = get_argument(command_builder);
                             std::string filename = clean_filename(dirty_filename);
+                            std::string path_to_file = directory_of_user + filename;
                             
+                            std::ofstream file_writer(path_to_file, std::ofstream::binary);
+                            if (!file_writer.is_open())
+                                send(client_socket, "550 File was not created\r\n", 26, 0);
+                            else
+                            {
+                                if (passive)
+                                {
+                                    if (data_connection != INVALID_SOCKET)
+                                    {
+                                        send(client_socket, "125 Data connection already open; transfer starting\r\n", 53, 0);
+
+                                        char buffer[1000];
+                                        int bytes_read;
+                                        while ((bytes_read = recv(data_connection, buffer, 1000, 0)) > 0)
+                                            file_writer.write(buffer, bytes_read);
+
+                                        send(client_socket, "226 Transfer OK\r\n", 17, 0);
+
+                                        // deallocate resources for this data socket
+                                        if (data_connection != INVALID_SOCKET)  // client should have already closed the connection, but anyway
+                                        {
+                                            closesocket(data_connection);
+                                            data_connection = INVALID_SOCKET;
+                                        }
+                                        passive = false;
+                                        access_the_queue.lock();
+                                        available_ports.push(passive_port);
+                                        access_the_queue.unlock();
+                                        passive_port = -1;
+                        }
+                    }
+                                else
+                                    ;// should have received port from client
+
+                                file_writer.close();
+                            }
                         }
                     }
                     else if (command == "list")
