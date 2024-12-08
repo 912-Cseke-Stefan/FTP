@@ -273,7 +273,7 @@ void FTPServer::get_command_from_client(SOCKET client_socket)
                                     passive_port = -1;
                                 }
                                 else
-                                    ;// should have received port from client
+                                    send(client_socket, "425 Can't open data connection\r\n", 32, 0);  // should have received port from client
 
                                 file_reader.close();
                             }
@@ -323,7 +323,7 @@ void FTPServer::get_command_from_client(SOCKET client_socket)
                                     passive_port = -1;
                                 }
                                 else
-                                    ;// should have received port from client
+                                    send(client_socket, "425 Can't open data connection\r\n", 32, 0);  // should have received port from client
 
                                 file_writer.close();
                             }
@@ -405,7 +405,7 @@ void FTPServer::get_command_from_client(SOCKET client_socket)
                                 passive_port = -1;
                             }
                             else
-                                ;// should have received port from client
+                                send(client_socket, "425 Can't open data connection\r\n", 32, 0);  // should have received port from client
                         }
                     }
                     else if (command == "pasv")
