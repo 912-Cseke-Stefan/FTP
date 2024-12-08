@@ -367,7 +367,7 @@ void FTPServer::get_command_from_client(SOCKET client_socket)
 
                                         strncpy(buffer + length, 
                                                 entry.path().string().substr(directory_of_user.size()).c_str(), 
-                                                997);
+                                                997 - length);
                                         buffer[strlen(buffer)] = 13;
                                         buffer[strlen(buffer)] = 10;
 
