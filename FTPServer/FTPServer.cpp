@@ -261,8 +261,8 @@ void FTPServer::get_command_from_client(SOCKET client_socket)
                                         available_ports.push(passive_port);
                                         access_the_queue.unlock();
                                         passive_port = -1;
-                        }
-                    }
+                                    }
+                                }
                                 else
                                     ;// should have received port from client
 
@@ -279,7 +279,7 @@ void FTPServer::get_command_from_client(SOCKET client_socket)
                             std::string dirty_filename = get_argument(command_builder);
                             std::string filename = clean_filename(dirty_filename);
                             std::string path_to_file = directory_of_user + filename;
-                            
+
                             std::ofstream file_writer(path_to_file, std::ofstream::binary);
                             if (!file_writer.is_open())
                                 send(client_socket, "550 File was not created\r\n", 26, 0);
@@ -309,8 +309,8 @@ void FTPServer::get_command_from_client(SOCKET client_socket)
                                         available_ports.push(passive_port);
                                         access_the_queue.unlock();
                                         passive_port = -1;
-                        }
-                    }
+                                    }
+                                }
                                 else
                                     ;// should have received port from client
 
@@ -350,7 +350,7 @@ void FTPServer::get_command_from_client(SOCKET client_socket)
                                         length += static_cast<int>(current_user.size());
                                         buffer[length] = ' ';
                                         length++;
-                            
+
                                         strncpy(buffer + length, 
                                                 std::to_string(std::filesystem::file_size(entry.path())).c_str(), 
                                                 std::to_string(std::filesystem::file_size(entry.path())).size());
@@ -384,8 +384,8 @@ void FTPServer::get_command_from_client(SOCKET client_socket)
                                     available_ports.push(passive_port);
                                     access_the_queue.unlock();
                                     passive_port = -1;
-                        }
-                    }
+                                }
+                            }
                             else
                                 ;// should have received port from client
                         }
@@ -403,9 +403,18 @@ void FTPServer::get_command_from_client(SOCKET client_socket)
                             access_the_queue.unlock();
                             // prepare to listen on the offered port
                             SOCKET listening_socket = start_listening_on_port(passive_port);
-                            send(client_socket, (std::string("227 Entering Passive Mode (127,0,0,1,") + std::to_string(passive_port) + std::string(")\r\n")).c_str(), 44, 0);  // Entering Passive Mode (h1,h2,h3,h4,p1,p2).
-                            // it is assummed that the client will try to connect immediately after getting the port
-                            data_connection = accept_connection_on_socket(listening_socket);
+                            
+                            send(client_socket, (std::string("227 Entering Passive Mode (127,0,0,1,") + std::to_string(passive_port/256) + std::string(",") + std::to_string(passive_port%256) + std::string(")\r\n")).c_str(), 44, 0);  // Entering Passive Mode (h1,h2,h3,h4,p1,p2).
+                            
+                            std::stringstream ss;
+                            ss << "PORT " << (char)127 << ',' << (char)0 << ',' << (char)0 << ',' << (char)1 << ',' << (char)(passive_port/256) << ',' << (char)(passive_port%256) << "\r\n";
+                            send(client_socket, ss.str().c_str(), 18, 0);
+                            
+                            char client_response[11];
+                            int response_length = recv(client_socket, client_response, 10, 0);
+                            client_response[response_length] = 0;
+                            if (std::string(client_response).find("200") == 0)
+                                data_connection = accept_connection_on_socket(listening_socket);
                         }
                     }
                     else
