@@ -220,13 +220,18 @@ void FTPServer::get_command_from_client(SOCKET client_socket)
                     }
                     else if (command == "quit")
                     {
-                        current_user = "";
-                        directory_of_user = "";
-                        send(client_socket, "221 Logged out\r\n", 16, 0);  // Logged out.
-                        access_the_queue.lock();
-                        available_ports.push(passive_port);
-                        access_the_queue.unlock();
-                        passive_port = -1;
+                        if (directory_of_user == "")
+                            send(client_socket, "530 Not logged in\r\n", 19, 0);  // Not logged in.
+                        else
+                        {
+                            current_user = "";
+                            directory_of_user = "";
+                            send(client_socket, "221 Logged out\r\n", 16, 0);  // Logged out.
+                            access_the_queue.lock();
+                            available_ports.push(passive_port);
+                            access_the_queue.unlock();
+                            passive_port = -1;
+                        }
                     }
                     else if (command == "retr")
                     {
