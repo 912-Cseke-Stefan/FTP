@@ -1,4 +1,6 @@
 #include "FTPClient.h"
+#include <thread>
+#include <chrono>
 
 const int BUFFER_SIZE = 8192;
 
@@ -40,11 +42,13 @@ void FTPClient::sendCommand(const std::string& cmd)  const{
 
 
 std::string FTPClient::readResponse() const {
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
     std::string response;
     char buffer[BUFFER_SIZE];
 
     timeval timeout{};
-    timeout.tv_sec = 1;
+    timeout.tv_sec = 5;
     timeout.tv_usec = 0;
     if (setsockopt(controlSocket, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout)) == SOCKET_ERROR) {
         throw std::runtime_error("Failed to set socket timeout: " + std::to_string(WSAGetLastError()));
@@ -69,7 +73,6 @@ std::string FTPClient::readResponse() const {
         buffer[bytesReceived] = '\0';
         response += buffer;
     }
-
     return response;
 }
 
