@@ -422,11 +422,50 @@ void FTPServer::get_command_from_client(SOCKET client_socket)
                             // prepare to listen on the offered port
                             listening_socket = start_listening_on_port(passive_port);
                             
+                            struct addrinfo* result = NULL, * ptr = NULL, hints;
+                            char hostname[256];
+
+                            if (gethostname(hostname, sizeof(hostname)) != 0) {
+                                //std::cerr << "gethostname failed with error " << WSAGetLastError() << std::endl;
+                                WSACleanup();
+                                return;
+                            }
+
+                            ZeroMemory(&hints, sizeof(hints));
+                            hints.ai_family = AF_INET;  // IPv4
+                            hints.ai_socktype = SOCK_STREAM;
+                            hints.ai_protocol = IPPROTO_TCP;
+
+                            // Get address info for the local machine's hostname
+                            int iResult = getaddrinfo(hostname, NULL, &hints, &result);
+                            if (iResult != 0) {
+                                //std::cerr << "getaddrinfo failed with error " << iResult << std::endl;
+                                WSACleanup();
+                                return;
+                            }
+
+                            char ipStr[INET_ADDRSTRLEN];
+                            // Loop through all the results and print the first valid address
+                            for (ptr = result; ptr != NULL; ptr = ptr->ai_next) 
+                            {
+                                struct sockaddr_in* sockaddr_ipv4 = (struct sockaddr_in*)ptr->ai_addr;
+
+                                // Convert the IP address to a string
+                                inet_ntop(AF_INET, &sockaddr_ipv4->sin_addr, ipStr, sizeof(ipStr));
+                                break; // We found a valid address, so we break
+                            }
+
+                            freeaddrinfo(result);
+
+                            std::string correct_ip_string = std::string(ipStr);
+                            std::ranges::replace(correct_ip_string, '.', ',');
+
                             send(client_socket, 
-                                 (std::string("227 Entering Passive Mode (127,0,0,1,") + 
+                                 (std::string("227 Entering Passive Mode (") + correct_ip_string + std::string(",") + 
                                     std::to_string(passive_port/256) + std::string(",") + 
-                                    std::to_string(passive_port%256) + std::string(")\r\n")).c_str(), 
-                                 41 + 
+                                    std::to_string(passive_port%256) + std::string(")") + std::string("\r\n")).c_str(), 
+                                 32 +
+                                    static_cast<int>(correct_ip_string.size()) + 
                                     static_cast<int>(std::to_string(passive_port/256).size()) + 
                                     static_cast<int>(std::to_string(passive_port%256).size()),
                                  0);  // Entering Passive Mode (h1,h2,h3,h4,p1,p2).
